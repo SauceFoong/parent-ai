@@ -5,3 +5,4 @@ AsyncStorage.clear()
   .then(() => console.log('✅ AsyncStorage cleared successfully'))
   .catch((error) => console.log('Error clearing storage:', error));
 
+

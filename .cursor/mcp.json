@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "firebase-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@gannonh/firebase-mcp"
+      ],
+      "env": {
+        "SERVICE_ACCOUNT_KEY_PATH": "/Users/sheeyaofoong/.firebase/parent-ai-serviceAccountKey.json",
+        "FIREBASE_STORAGE_BUCKET": "parent-ai-cf603.appspot.com",
+        "DEBUG_LOG_FILE": "true"
+      }
+    },
+    "Render": {
+      "url": "https://mcp.render.com/mcp",
+      "headers": {
+        "Authorization": "Bearer rnd_0eSzDk6hvWTGwTP4SwLGTEepnQW1"
+      }
+    }
+  }
+}
