@@ -1,7 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = 'http://localhost:3000/api'; // Simulator can use localhost
+const API_URL = 'https://parent-ai-backend.onrender.com/api'; // Production backend
 
 // Create axios instance
 const api = axios.create({

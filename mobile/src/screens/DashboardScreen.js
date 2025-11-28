@@ -7,10 +7,10 @@ import {
   RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
-  SafeAreaView,
   Platform,
   StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { monitoringAPI } from '../services/api';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,8 +22,12 @@ export default function DashboardScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    loadStats();
-  }, []);
+    if (user) {
+      loadStats();
+    } else {
+      setLoading(false);
+    }
+  }, [user]);
 
   const loadStats = async () => {
     try {
