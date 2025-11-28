@@ -1,0 +1,40 @@
+{
+  "name": "parent-ai",
+  "version": "1.0.0",
+  "description": "AI-powered parental control app for monitoring kids' screen time",
+  "main": "index.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "nodemon backend/server.js",
+    "mobile": "cd mobile && npm start",
+    "mobile:ios": "cd mobile && npm run ios",
+    "mobile:android": "cd mobile && npm run android"
+  },
+  "keywords": [
+    "parental-control",
+    "ai",
+    "content-monitoring",
+    "mobile-app"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "mongoose": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3",
+    "axios": "^1.6.0",
+    "firebase-admin": "^12.0.0",
+    "multer": "^1.4.5-lts.1",
+    "openai": "^4.20.0",
+    "sharp": "^0.33.0",
+    "winston": "^3.11.0",
+    "node-schedule": "^2.1.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
+

@@ -1,0 +1,60 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check file size (max 10MB)
+    function isValidSize() {
+      return request.resource.size < 10 * 1024 * 1024;
+    }
+    
+    // Helper function to check if file is an image
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    
+    // Screenshots folder - organized by userId
+    match /screenshots/{userId}/{fileName} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isAuthenticated() && 
+                      request.auth.uid == userId && 
+                      isValidSize() && 
+                      isImage();
+      allow delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Profile images
+    match /profiles/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && 
+                      request.auth.uid == userId && 
+                      request.resource.size < 5 * 1024 * 1024 && 
+                      isImage();
+      allow delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Temporary uploads (auto-delete after 24 hours)
+    match /temp/{userId}/{fileName} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isAuthenticated() && 
+                      request.auth.uid == userId && 
+                      isValidSize();
+      allow delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Test folder (for development only - remove in production)
+    match /test/{fileName} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // Deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
