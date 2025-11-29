@@ -170,17 +170,23 @@ export default function ActivityTimelineScreen({ navigation, route }) {
             
             {timeline.map((item, index) => (
               <TouchableOpacity 
-                key={index} 
+                key={item.id || index} 
                 style={styles.timelineItem}
                 onPress={() => {
-                  // Find the corresponding summary with full data
-                  const fullSummary = summaries.find(s => s.timestamp === item.timestamp);
+                  // Pass the activity data - if it's from 'activity' source, it has screenshot
                   navigation.navigate('ActivityDetail', { 
                     activity: {
-                      ...item,
-                      ...fullSummary,
+                      id: item.id,
                       contentTitle: item.activity,
                       activityType: item.type,
+                      timestamp: item.timestamp,
+                      duration: item.duration,
+                      screenshotUrl: item.screenshotUrl,
+                      aiAnalysis: item.aiAnalysis,
+                      contentUrl: item.contentUrl,
+                      flagged: item.flagged,
+                      appState: item.appState,
+                      childName: childName,
                     }
                   });
                 }}
@@ -219,6 +225,16 @@ export default function ActivityTimelineScreen({ navigation, route }) {
                           <Text style={styles.activityDuration}>
                             • {formatDuration(item.duration)}
                           </Text>
+                        )}
+                        {item.screenshotUrl && (
+                          <View style={styles.screenshotBadge}>
+                            <Ionicons name="camera" size={12} color="#667eea" />
+                          </View>
+                        )}
+                        {item.flagged && (
+                          <View style={styles.flaggedBadge}>
+                            <Ionicons name="warning" size={12} color="#e74c3c" />
+                          </View>
                         )}
                       </View>
                     </View>
@@ -452,6 +468,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#718096',
     marginLeft: 4,
+  },
+  screenshotBadge: {
+    marginLeft: 6,
+    backgroundColor: '#e0e7ff',
+    padding: 3,
+    borderRadius: 4,
+  },
+  flaggedBadge: {
+    marginLeft: 6,
+    backgroundColor: '#fed7d7',
+    padding: 3,
+    borderRadius: 4,
   },
   appStateBadge: {
     paddingHorizontal: 8,

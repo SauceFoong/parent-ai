@@ -436,6 +436,8 @@ exports.getChildSummaries = async (req, res) => {
     const { childName } = req.params;
     const { limit = 60, minutes = 60 } = req.query; // Default last 60 minutes
 
+    const cutoffTime = new Date(Date.now() - parseInt(minutes) * 60 * 1000);
+
     // Get summaries for this child
     const summaries = await firestoreService.queryDocuments('activitySummaries', {
       where: [
@@ -444,29 +446,73 @@ exports.getChildSummaries = async (req, res) => {
       ],
     });
 
-    // Filter to last N minutes and sort
-    const cutoffTime = new Date(Date.now() - parseInt(minutes) * 60 * 1000);
+    // Also get activities with screenshots for this child
+    const activities = await firestoreService.queryDocuments('activities', {
+      where: [
+        ['childName', '==', childName],
+      ],
+    });
+
+    // Filter summaries to last N minutes
     const recentSummaries = summaries
       .filter(s => new Date(s.timestamp) >= cutoffTime)
+      .map(s => ({
+        id: s.id,
+        source: 'summary',
+        timestamp: s.timestamp,
+        activity: s.currentActivity?.title || 'Parent AI Child App',
+        type: s.currentActivity?.type || 'app',
+        duration: s.currentActivity?.duration || 0,
+        appState: s.appState || 'active',
+        screenshotUrl: null,
+        aiAnalysis: null,
+        contentUrl: null,
+      }));
+
+    // Filter activities to last N minutes and add to timeline
+    const recentActivities = activities
+      .filter(a => new Date(a.timestamp) >= cutoffTime)
+      .map(a => ({
+        id: a.id,
+        source: 'activity',
+        timestamp: a.timestamp,
+        activity: a.contentTitle || 'Web Activity',
+        type: a.activityType || 'web',
+        duration: 0,
+        appState: 'active',
+        screenshotUrl: a.screenshotUrl || null,
+        aiAnalysis: a.aiAnalysis || null,
+        contentUrl: a.contentUrl || null,
+        flagged: a.flagged || false,
+      }));
+
+    // Combine and sort by timestamp (newest first)
+    const allItems = [...recentSummaries, ...recentActivities]
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
       .slice(0, parseInt(limit));
 
     // Create a timeline of activities
-    const timeline = recentSummaries.map(s => ({
-      time: new Date(s.timestamp).toLocaleTimeString(),
-      timestamp: s.timestamp,
-      activity: s.currentActivity?.title || 'Idle',
-      type: s.currentActivity?.type || 'idle',
-      duration: s.currentActivity?.duration || 0,
-      appState: s.appState,
+    const timeline = allItems.map(item => ({
+      id: item.id,
+      time: new Date(item.timestamp).toLocaleTimeString(),
+      timestamp: item.timestamp,
+      activity: item.activity,
+      type: item.type,
+      duration: item.duration,
+      appState: item.appState,
+      screenshotUrl: item.screenshotUrl,
+      aiAnalysis: item.aiAnalysis,
+      contentUrl: item.contentUrl,
+      flagged: item.flagged,
+      source: item.source,
     }));
 
     res.json({
       success: true,
       childName,
-      count: recentSummaries.length,
+      count: allItems.length,
       timeline,
-      summaries: recentSummaries,
+      summaries: allItems,
     });
   } catch (error) {
     logger.error(`Get child summaries error: ${error.message}`);
