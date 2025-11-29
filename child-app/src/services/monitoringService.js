@@ -40,12 +40,27 @@ export const getDeviceInfo = async () => {
 // Track when entering/exiting Safe Browser
 export const enterSafeBrowser = () => {
   isInSafeBrowser = true;
-  console.log('Entered Safe Browser - pausing app activity reports');
+  console.log('>>> ENTERED Safe Browser - pausing app activity reports');
+  
+  // Also pause the summary interval while in browser
+  if (summaryInterval) {
+    clearInterval(summaryInterval);
+    summaryInterval = null;
+    console.log('Summary interval paused');
+  }
 };
 
 export const exitSafeBrowser = () => {
   isInSafeBrowser = false;
-  console.log('Exited Safe Browser - resuming app activity reports');
+  console.log('>>> EXITED Safe Browser - resuming app activity reports');
+  
+  // Resume summary interval when leaving browser
+  if (!summaryInterval) {
+    summaryInterval = setInterval(() => {
+      sendSummaryReport();
+    }, SUMMARY_INTERVAL);
+    console.log('Summary interval resumed');
+  }
 };
 
 export const isUserInSafeBrowser = () => isInSafeBrowser;

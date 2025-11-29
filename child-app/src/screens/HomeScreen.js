@@ -18,6 +18,7 @@ import {
   sendSummaryReport,
   startActivity,
   endActivity,
+  isUserInSafeBrowser,
 } from '../services/monitoringService';
 import { childAPI } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -42,7 +43,10 @@ export default function HomeScreen({ navigation }) {
 
   const handleHeartbeat = async () => {
     await sendHeartbeat();
-    await sendSummaryReport();
+    // Only send summary if not in Safe Browser
+    if (!isUserInSafeBrowser()) {
+      await sendSummaryReport();
+    }
     setLastSync(new Date());
   };
 
