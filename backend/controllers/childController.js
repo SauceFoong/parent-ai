@@ -438,40 +438,17 @@ exports.getChildSummaries = async (req, res) => {
 
     const cutoffTime = new Date(Date.now() - parseInt(minutes) * 60 * 1000);
 
-    // Get summaries for this child
-    const summaries = await firestoreService.queryDocuments('activitySummaries', {
-      where: [
-        ['parentId', '==', parentId],
-        ['childName', '==', childName],
-      ],
-    });
-
-    // Also get activities with screenshots for this child
+    // Only get web activities (from Safe Browser) - skip app summaries for now
     const activities = await firestoreService.queryDocuments('activities', {
       where: [
         ['childName', '==', childName],
       ],
     });
 
-    // Filter summaries to last N minutes
-    const recentSummaries = summaries
-      .filter(s => new Date(s.timestamp) >= cutoffTime)
-      .map(s => ({
-        id: s.id,
-        source: 'summary',
-        timestamp: s.timestamp,
-        activity: s.currentActivity?.title || 'Parent AI Child App',
-        type: s.currentActivity?.type || 'app',
-        duration: s.currentActivity?.duration || 0,
-        appState: s.appState || 'active',
-        screenshotUrl: null,
-        aiAnalysis: null,
-        contentUrl: null,
-      }));
-
-    // Filter activities to last N minutes and add to timeline
+    // Filter activities to last N minutes - only show web activities with screenshots
     const recentActivities = activities
       .filter(a => new Date(a.timestamp) >= cutoffTime)
+      .filter(a => a.activityType === 'web') // Only web activities
       .map(a => ({
         id: a.id,
         source: 'activity',
@@ -486,8 +463,8 @@ exports.getChildSummaries = async (req, res) => {
         flagged: a.flagged || false,
       }));
 
-    // Combine and sort by timestamp (newest first)
-    const allItems = [...recentSummaries, ...recentActivities]
+    // Sort by timestamp (newest first) and limit
+    const allItems = recentActivities
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
       .slice(0, parseInt(limit));
 
