@@ -169,7 +169,23 @@ export default function ActivityTimelineScreen({ navigation, route }) {
             <Text style={styles.sectionTitle}>Activity Timeline</Text>
             
             {timeline.map((item, index) => (
-              <View key={index} style={styles.timelineItem}>
+              <TouchableOpacity 
+                key={index} 
+                style={styles.timelineItem}
+                onPress={() => {
+                  // Find the corresponding summary with full data
+                  const fullSummary = summaries.find(s => s.timestamp === item.timestamp);
+                  navigation.navigate('ActivityDetail', { 
+                    activity: {
+                      ...item,
+                      ...fullSummary,
+                      contentTitle: item.activity,
+                      activityType: item.type,
+                    }
+                  });
+                }}
+                activeOpacity={0.7}
+              >
                 <View style={styles.timelineLeft}>
                   <Text style={styles.timelineTime}>{item.time}</Text>
                   <View style={[
@@ -206,6 +222,7 @@ export default function ActivityTimelineScreen({ navigation, route }) {
                         )}
                       </View>
                     </View>
+                    <Ionicons name="chevron-forward" size={18} color="#cbd5e0" />
                     <View style={[
                       styles.appStateBadge,
                       item.appState === 'active' ? styles.appStateActive : styles.appStateBackground
@@ -216,7 +233,7 @@ export default function ActivityTimelineScreen({ navigation, route }) {
                     </View>
                   </View>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         ) : (

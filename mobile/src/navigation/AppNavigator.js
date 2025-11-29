@@ -16,6 +16,7 @@ import SettingsScreen from '../screens/SettingsScreen';
 import AddChildScreen from '../screens/AddChildScreen';
 import LinkDeviceScreen from '../screens/LinkDeviceScreen';
 import ActivityTimelineScreen from '../screens/ActivityTimelineScreen';
+import ActivityDetailScreen from '../screens/ActivityDetailScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -152,6 +153,13 @@ function MainStack() {
       <Stack.Screen
         name="ActivityTimeline"
         component={ActivityTimelineScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="ActivityDetail"
+        component={ActivityDetailScreen}
         options={{
           headerShown: false,
         }}

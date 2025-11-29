@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   submitActivity,
   getActivities,
+  getActivity,
   getStats,
   updateDuration,
 } = require('../controllers/monitoringController');
@@ -10,6 +11,7 @@ const { protect } = require('../middleware/auth');
 
 router.post('/activity', protect, submitActivity);
 router.get('/activities', protect, getActivities);
+router.get('/activity/:id', protect, getActivity);
 router.get('/stats', protect, getStats);
 router.put('/activity/:id/duration', protect, updateDuration);
 

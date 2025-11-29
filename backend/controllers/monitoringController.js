@@ -1,7 +1,38 @@
 const firestoreService = require('../services/firestoreService');
 const aiService = require('../services/aiService');
 const notificationService = require('../services/notificationService');
+const { getStorage } = require('../config/firebaseAdmin');
 const logger = require('../utils/logger');
+
+// Helper to upload screenshot to Firebase Storage
+const uploadScreenshot = async (base64Data, activityId) => {
+  try {
+    const storage = getStorage();
+    const bucket = storage.bucket();
+    
+    // Remove data URL prefix if present
+    const base64Image = base64Data.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Image, 'base64');
+    
+    const fileName = `screenshots/${activityId}.jpg`;
+    const file = bucket.file(fileName);
+    
+    await file.save(buffer, {
+      metadata: {
+        contentType: 'image/jpeg',
+      },
+    });
+    
+    // Make the file publicly accessible
+    await file.makePublic();
+    
+    // Return the public URL
+    return `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+  } catch (error) {
+    logger.error(`Screenshot upload error: ${error.message}`);
+    return null;
+  }
+};
 
 // @desc    Submit new activity for monitoring
 // @route   POST /api/monitoring/activity
@@ -12,6 +43,7 @@ exports.submitActivity = async (req, res) => {
     
     let aiAnalysis = null;
     let flagged = false;
+    let screenshotUrl = null;
 
     // If screenshot is provided, analyze it with AI
     if (screenshot && process.env.OPENAI_API_KEY) {
@@ -68,17 +100,33 @@ exports.submitActivity = async (req, res) => {
       }
     }
 
+    // Create activity first to get ID
     const activityData = {
       ...req.body,
       userId: req.user?.id || 'child-device',
       timestamp: new Date().toISOString(),
       flagged,
       aiAnalysis,
-      // Don't store the full screenshot in the activity (too large)
-      screenshot: screenshot ? '[screenshot captured]' : null,
+      screenshot: null, // Will be updated with URL
+      screenshotUrl: null,
     };
 
     const activity = await firestoreService.createDocument('activities', activityData);
+
+    // Upload screenshot to Firebase Storage if provided
+    if (screenshot) {
+      try {
+        screenshotUrl = await uploadScreenshot(screenshot, activity.id);
+        if (screenshotUrl) {
+          await firestoreService.updateDocument('activities', activity.id, {
+            screenshotUrl,
+            screenshot: '[stored in Firebase Storage]',
+          });
+        }
+      } catch (uploadError) {
+        logger.error(`Screenshot upload failed: ${uploadError.message}`);
+      }
+    }
 
     res.status(201).json({
       success: true,
@@ -86,10 +134,40 @@ exports.submitActivity = async (req, res) => {
         id: activity.id,
         flagged: activity.flagged,
         aiAnalysis: activity.aiAnalysis,
+        screenshotUrl,
       },
     });
   } catch (error) {
     logger.error(`Submit activity error: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+    });
+  }
+};
+
+// @desc    Get single activity by ID
+// @route   GET /api/monitoring/activity/:id
+// @access  Private
+exports.getActivity = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const activity = await firestoreService.getDocument('activities', id);
+    
+    if (!activity) {
+      return res.status(404).json({
+        success: false,
+        message: 'Activity not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      activity,
+    });
+  } catch (error) {
+    logger.error(`Get activity error: ${error.message}`);
     res.status(500).json({
       success: false,
       message: 'Server error',
