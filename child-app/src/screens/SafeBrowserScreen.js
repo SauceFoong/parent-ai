@@ -62,6 +62,9 @@ export default function SafeBrowserScreen({ navigation }) {
     }
   };
 
+  // Store the latest page info from WebView
+  const latestPageInfo = useRef({ title: '', url: '' });
+  
   const captureAndSendScreenshot = async (force = false) => {
     try {
       // Prevent concurrent captures
@@ -77,10 +80,27 @@ export default function SafeBrowserScreen({ navigation }) {
         return;
       }
       
-      if (!viewShotRef.current) return;
+      if (!viewShotRef.current || !webViewRef.current) return;
       
       isCapturing.current = true;
       lastScreenshotTime.current = now;
+      
+      // First, get the CURRENT page title and URL directly from WebView
+      // Wait a moment for the JS to execute and update latestPageInfo
+      await new Promise((resolve) => {
+        webViewRef.current.injectJavaScript(`
+          (function() {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'captureInfo',
+              title: document.title,
+              url: window.location.href
+            }));
+          })();
+          true;
+        `);
+        // Give it 300ms to get the response
+        setTimeout(resolve, 300);
+      });
       
       // Capture screenshot
       const uri = await captureRef(viewShotRef, {
@@ -91,13 +111,16 @@ export default function SafeBrowserScreen({ navigation }) {
 
       const childName = await AsyncStorage.getItem('childName');
       
-      // Get a meaningful title - fallback to URL domain if title is empty
-      let title = currentTitle;
+      // Use the latest page info (updated by captureInfo message)
+      // Fall back to state if not available
+      const currentUrl = latestPageInfo.current.url || url;
+      let title = latestPageInfo.current.title || currentTitle;
+      
+      // If still no title, extract from URL
       if (!title || title.trim() === '') {
-        // Extract domain from URL as fallback
         try {
-          const urlObj = new URL(url);
-          title = urlObj.hostname.replace('www.', '');
+          const urlObj = new URL(currentUrl);
+          title = urlObj.hostname.replace('www.', '').replace('m.', '');
           
           // Add path info for context
           if (urlObj.pathname && urlObj.pathname !== '/') {
@@ -107,7 +130,7 @@ export default function SafeBrowserScreen({ navigation }) {
             }
           }
         } catch (e) {
-          title = url;
+          title = currentUrl;
         }
       }
       
@@ -116,12 +139,12 @@ export default function SafeBrowserScreen({ navigation }) {
         childName: childName || 'Unknown',
         activityType: 'web',
         contentTitle: title,
-        contentUrl: url,
+        contentUrl: currentUrl,
         screenshot: uri, // Base64 image
         timestamp: new Date().toISOString(),
       });
 
-      console.log('Screenshot captured and sent:', title);
+      console.log('Screenshot captured and sent:', title, 'URL:', currentUrl);
     } catch (error) {
       console.log('Screenshot capture failed:', error.message);
     } finally {
@@ -186,6 +209,18 @@ export default function SafeBrowserScreen({ navigation }) {
           setCurrentTitle(data.title);
           console.log('Page title updated:', data.title);
         }
+        // Also update the ref for immediate access
+        latestPageInfo.current = {
+          title: data.title || '',
+          url: data.url || url,
+        };
+      } else if (data.type === 'captureInfo') {
+        // Update the ref immediately for screenshot capture
+        latestPageInfo.current = {
+          title: data.title || '',
+          url: data.url || url,
+        };
+        console.log('Capture info received:', data.title, data.url);
       }
     } catch (e) {
       // Ignore non-JSON messages
