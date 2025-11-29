@@ -1,4 +1,6 @@
 const firestoreService = require('../services/firestoreService');
+const aiService = require('../services/aiService');
+const notificationService = require('../services/notificationService');
 const logger = require('../utils/logger');
 
 // @desc    Submit new activity for monitoring
@@ -6,11 +8,74 @@ const logger = require('../utils/logger');
 // @access  Private
 exports.submitActivity = async (req, res) => {
   try {
+    const { screenshot, childName, contentTitle, contentUrl, activityType } = req.body;
+    
+    let aiAnalysis = null;
+    let flagged = false;
+
+    // If screenshot is provided, analyze it with AI
+    if (screenshot && process.env.OPENAI_API_KEY) {
+      try {
+        logger.info(`Analyzing screenshot for: ${contentTitle}`);
+        aiAnalysis = await aiService.analyzeContent({
+          screenshot,
+          contentTitle,
+          contentUrl,
+          activityType,
+        });
+        
+        // Check if content should be flagged
+        if (aiAnalysis && aiAnalysis.flagged) {
+          flagged = true;
+          logger.warn(`Content flagged: ${contentTitle} - ${aiAnalysis.reason}`);
+          
+          // Send notification to parent
+          try {
+            const devices = await firestoreService.queryDocuments('linkedDevices', {
+              where: [['childName', '==', childName]],
+            });
+            
+            if (devices.length > 0) {
+              const parent = await firestoreService.getDocument('users', devices[0].parentId);
+              if (parent && parent.deviceTokens && parent.deviceTokens.length > 0) {
+                await notificationService.sendPushNotification(
+                  parent.deviceTokens,
+                  'Content Alert',
+                  `${childName} viewed potentially inappropriate content: ${contentTitle}`,
+                  { activityType, contentTitle, reason: aiAnalysis.reason }
+                );
+              }
+              
+              // Save notification to database
+              await firestoreService.createDocument('notifications', {
+                userId: devices[0].parentId,
+                childName,
+                type: 'content_alert',
+                title: 'Content Alert',
+                message: `${childName} viewed: ${contentTitle}`,
+                aiAnalysis,
+                read: false,
+                createdAt: new Date().toISOString(),
+              });
+            }
+          } catch (notifError) {
+            logger.error(`Notification error: ${notifError.message}`);
+          }
+        }
+      } catch (aiError) {
+        logger.error(`AI analysis error: ${aiError.message}`);
+        // Continue without AI analysis
+      }
+    }
+
     const activityData = {
       ...req.body,
-      userId: req.user.id,
+      userId: req.user?.id || 'child-device',
       timestamp: new Date().toISOString(),
-      flagged: false,
+      flagged,
+      aiAnalysis,
+      // Don't store the full screenshot in the activity (too large)
+      screenshot: screenshot ? '[screenshot captured]' : null,
     };
 
     const activity = await firestoreService.createDocument('activities', activityData);

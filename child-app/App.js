@@ -7,15 +7,19 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { DeviceProvider, useDevice } from './src/context/DeviceContext';
 import SetupScreen from './src/screens/SetupScreen';
 import HomeScreen from './src/screens/HomeScreen';
-import AppUsageScreen from './src/screens/AppUsageScreen';
+import SafeBrowserScreen from './src/screens/SafeBrowserScreen';
 
 const Stack = createNativeStackNavigator();
 
-function LinkedNavigator() {
+function LinkedStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen name="AppUsage" component={AppUsageScreen} />
+      <Stack.Screen 
+        name="SafeBrowser" 
+        component={SafeBrowserScreen}
+        options={{ animation: 'slide_from_bottom' }}
+      />
     </Stack.Navigator>
   );
 }
@@ -31,7 +35,7 @@ function AppContent() {
     );
   }
 
-  return isLinked ? <LinkedNavigator /> : <SetupScreen />;
+  return isLinked ? <LinkedStack /> : <SetupScreen />;
 }
 
 export default function App() {

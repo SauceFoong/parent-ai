@@ -150,6 +150,23 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
 
+        {/* Safe Browser Button */}
+        <TouchableOpacity 
+          style={styles.browserButton}
+          onPress={() => navigation.navigate('SafeBrowser')}
+        >
+          <View style={styles.browserButtonContent}>
+            <View style={styles.browserIconContainer}>
+              <Ionicons name="globe" size={28} color="#fff" />
+            </View>
+            <View style={styles.browserTextContainer}>
+              <Text style={styles.browserButtonTitle}>Safe Browser</Text>
+              <Text style={styles.browserButtonSubtitle}>Browse the web safely</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#667eea" />
+          </View>
+        </TouchableOpacity>
+
         {/* Info Cards */}
         <View style={styles.infoSection}>
           <Text style={styles.sectionTitle}>What's Being Monitored</Text>
@@ -173,7 +190,7 @@ export default function HomeScreen({ navigation }) {
             <View style={styles.infoContent}>
               <Text style={styles.infoTitle}>Web Activity</Text>
               <Text style={styles.infoDescription}>
-                Websites you visit in the browser
+                Websites you visit in the Safe Browser
               </Text>
             </View>
           </View>
@@ -190,15 +207,6 @@ export default function HomeScreen({ navigation }) {
             </View>
           </View>
         </View>
-
-        {/* Screen Time Button */}
-        <TouchableOpacity 
-          style={styles.screenTimeButton} 
-          onPress={() => navigation.navigate('AppUsage')}
-        >
-          <Ionicons name="time" size={22} color="#fff" />
-          <Text style={styles.screenTimeButtonText}>View My Screen Time</Text>
-        </TouchableOpacity>
 
         {/* Report Activity Button */}
         <TouchableOpacity 
@@ -389,6 +397,45 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#4a5568',
   },
+  browserButton: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 24,
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 4,
+    borderWidth: 2,
+    borderColor: '#667eea',
+  },
+  browserButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  browserIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: '#667eea',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  browserTextContainer: {
+    flex: 1,
+  },
+  browserButtonTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1a202c',
+    marginBottom: 2,
+  },
+  browserButtonSubtitle: {
+    fontSize: 13,
+    color: '#718096',
+  },
   infoSection: {
     marginBottom: 24,
   },
@@ -431,26 +478,6 @@ const styles = StyleSheet.create({
   infoDescription: {
     fontSize: 13,
     color: '#718096',
-  },
-  screenTimeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#667eea',
-    borderRadius: 14,
-    height: 54,
-    gap: 10,
-    marginBottom: 12,
-    shadowColor: '#667eea',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  screenTimeButtonText: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#fff',
   },
   reportButton: {
     flexDirection: 'row',

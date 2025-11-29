@@ -20,30 +20,36 @@ class AIService {
 
   /**
    * Analyze content using OpenAI Vision API
-   * @param {string} imageUrl - URL or base64 of the screenshot
-   * @param {string} contentText - Text content (title, description)
+   * @param {Object} params - Content parameters
+   * @param {string} params.screenshot - Base64 screenshot
+   * @param {string} params.contentTitle - Content title
+   * @param {string} params.contentUrl - Content URL
+   * @param {string} params.activityType - Type of activity
    * @returns {Object} Analysis results
    */
-  async analyzeContent(imageUrl, contentText = '') {
+  async analyzeContent({ screenshot, contentTitle = '', contentUrl = '', activityType = '' }) {
     try {
-      const prompt = `You are a parental control AI assistant. Analyze this content (image and/or text) and determine if it's appropriate for children.
+      const prompt = `You are a parental control AI assistant. Analyze this screenshot from a child's device and determine if the content is appropriate for children.
+
+Content Title: ${contentTitle}
+Content URL: ${contentUrl}
+Activity Type: ${activityType}
 
 Rate the following categories from 0 to 1 (0 = safe, 1 = highly inappropriate):
-1. Violence level (weapons, fighting, blood, etc.)
-2. Adult content (sexual content, nudity, etc.)
-3. General inappropriateness (drugs, profanity, dangerous activities, etc.)
+1. Violence level (weapons, fighting, blood, gore, etc.)
+2. Adult content (sexual content, nudity, suggestive content, etc.)
+3. General inappropriateness (drugs, profanity, dangerous activities, gambling, etc.)
 
-Content Text: ${contentText}
-
-Provide your response in JSON format:
+Respond ONLY with valid JSON (no markdown, no code blocks):
 {
-  "violenceScore": <number>,
-  "adultContentScore": <number>,
-  "inappropriateScore": <number>,
-  "detectedCategories": [<array of concerning elements>],
-  "summary": "<brief explanation>",
-  "confidence": <number>,
-  "isInappropriate": <boolean>
+  "violenceScore": <number 0-1>,
+  "adultContentScore": <number 0-1>,
+  "inappropriateScore": <number 0-1>,
+  "detectedCategories": [<array of concerning elements found>],
+  "summary": "<brief 1-2 sentence explanation of what you see>",
+  "confidence": <number 0-1>,
+  "flagged": <boolean - true if any score > 0.5>,
+  "reason": "<if flagged, explain why>"
 }`;
 
       const messages = [
@@ -55,28 +61,47 @@ Provide your response in JSON format:
         },
       ];
 
-      // Add image if provided
-      if (imageUrl) {
+      // Add screenshot if provided
+      if (screenshot) {
+        // Handle base64 image
+        const imageUrl = screenshot.startsWith('data:') 
+          ? screenshot 
+          : `data:image/jpeg;base64,${screenshot}`;
+          
         messages[0].content.push({
           type: 'image_url',
-          image_url: { url: imageUrl },
+          image_url: { 
+            url: imageUrl,
+            detail: 'low', // Use low detail to reduce tokens
+          },
         });
       }
 
       const response = await this.openai.chat.completions.create({
-        model: 'gpt-4-vision-preview',
+        model: 'gpt-4o', // Updated model name
         messages,
         max_tokens: 500,
       });
 
-      const result = JSON.parse(response.choices[0].message.content);
-      logger.info(`AI Analysis completed: ${result.summary}`);
+      // Parse the response, handling potential markdown code blocks
+      let content = response.choices[0].message.content;
+      content = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      
+      const result = JSON.parse(content);
+      
+      // Ensure flagged is set correctly
+      result.flagged = result.flagged || 
+        result.violenceScore > 0.5 || 
+        result.adultContentScore > 0.5 || 
+        result.inappropriateScore > 0.5;
+      
+      logger.info(`AI Analysis completed: ${result.summary} (flagged: ${result.flagged})`);
       
       return result;
     } catch (error) {
       logger.error(`AI Analysis error: ${error.message}`);
       // Fallback to keyword-based analysis
-      return this.fallbackAnalysis(contentText);
+      return this.fallbackAnalysis(contentTitle);
     }
   }
 
