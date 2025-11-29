@@ -58,7 +58,7 @@ const initializeFirebase = () => {
     // Initialize Firebase Admin
     firebaseApp = admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
-      storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'parent-ai-cf603.appspot.com',
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'parent-ai-cf603.firebasestorage.app',
     });
 
     // Get Firestore instance
@@ -71,7 +71,7 @@ const initializeFirebase = () => {
     });
 
     logger.info('Firebase Admin SDK initialized successfully');
-    logger.info(`Storage Bucket: ${process.env.FIREBASE_STORAGE_BUCKET || 'parent-ai-cf603.appspot.com'}`);
+    logger.info(`Storage Bucket: ${process.env.FIREBASE_STORAGE_BUCKET || 'parent-ai-cf603.firebasestorage.app'}`);
 
     return { app: firebaseApp, db };
   } catch (error) {
