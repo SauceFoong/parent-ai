@@ -205,6 +205,10 @@ export const stopSummaryReporting = () => {
   console.log('Summary reporting stopped');
 };
 
+// Track when app went to background
+let backgroundStartTime = null;
+let lastKnownState = 'active';
+
 // Monitor app state changes
 export const startAppStateMonitoring = () => {
   if (appStateSubscription) {
@@ -214,21 +218,106 @@ export const startAppStateMonitoring = () => {
   appStateSubscription = AppState.addEventListener('change', async (nextAppState) => {
     console.log('App state changed to:', nextAppState);
     
-    if (nextAppState === 'active') {
-      // App came to foreground
+    if (nextAppState === 'active' && lastKnownState !== 'active') {
+      // App came back to foreground
+      
+      // Calculate time spent away
+      if (backgroundStartTime) {
+        const awayDuration = Math.floor((Date.now() - backgroundStartTime) / 1000);
+        console.log(`Child was away for ${awayDuration} seconds`);
+        
+        // Report the "away" activity
+        if (awayDuration > 10) { // Only report if away for more than 10 seconds
+          await reportAwayActivity(awayDuration);
+        }
+        backgroundStartTime = null;
+      }
+      
+      // Send a summary when returning
+      await sendSummaryReport();
+      
+      // Start tracking current app
       startActivity('app', 'Parent AI Child App');
-    } else if (nextAppState === 'background') {
+      
+    } else if (nextAppState === 'background' && lastKnownState === 'active') {
       // App went to background
+      backgroundStartTime = Date.now();
+      
+      // End current activity
       await endActivity();
+      
+      // Send final summary before going to background
+      await sendBackgroundNotice();
     }
+    
+    lastKnownState = nextAppState;
   });
   
   // Start with current state
   if (AppState.currentState === 'active') {
     startActivity('app', 'Parent AI Child App');
+    lastKnownState = 'active';
   }
   
   console.log('App state monitoring started');
+};
+
+// Report that child was using phone but not in monitored app
+const reportAwayActivity = async (duration) => {
+  try {
+    const childName = await AsyncStorage.getItem('childName');
+    const deviceToken = await AsyncStorage.getItem('deviceToken');
+    
+    if (!childName || !deviceToken) return;
+    
+    // Submit an "unmonitored" activity
+    await childAPI.submitActivity({
+      childName,
+      activityType: 'unmonitored',
+      contentTitle: 'Using other apps (unmonitored)',
+      contentUrl: null,
+      duration,
+      timestamp: new Date(Date.now() - duration * 1000).toISOString(),
+    });
+    
+    console.log(`Reported ${duration}s of unmonitored activity`);
+  } catch (error) {
+    console.log('Failed to report away activity:', error.message);
+  }
+};
+
+// Send notice when going to background
+const sendBackgroundNotice = async () => {
+  try {
+    const childName = await AsyncStorage.getItem('childName');
+    const deviceToken = await AsyncStorage.getItem('deviceToken');
+    
+    if (!childName || !deviceToken) return;
+    
+    const deviceInfo = await getDeviceInfo();
+    
+    await childAPI.submitSummary({
+      childName,
+      deviceId: deviceToken,
+      timestamp: new Date().toISOString(),
+      appState: 'background',
+      currentActivity: {
+        type: 'background',
+        title: 'App moved to background - child using other apps',
+        duration: 0,
+      },
+      deviceInfo: {
+        deviceName: deviceInfo.deviceName,
+        osName: deviceInfo.osName,
+        osVersion: deviceInfo.osVersion,
+      },
+      event: 'app_backgrounded',
+    });
+    
+    console.log('Background notice sent');
+  } catch (error) {
+    console.log('Failed to send background notice:', error.message);
+  }
 };
 
 // Stop app state monitoring

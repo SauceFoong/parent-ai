@@ -6,20 +6,32 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  TextInput,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useDevice } from '../context/DeviceContext';
-import { sendHeartbeat, isBackgroundFetchRegistered } from '../services/monitoringService';
+import { 
+  sendHeartbeat, 
+  isBackgroundFetchRegistered, 
+  sendSummaryReport,
+  startActivity,
+  endActivity,
+} from '../services/monitoringService';
+import { childAPI } from '../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function HomeScreen() {
   const { childName, parentName, monitoringActive, unlinkDevice } = useDevice();
   const [backgroundActive, setBackgroundActive] = useState(false);
   const [lastSync, setLastSync] = useState(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [activityTitle, setActivityTitle] = useState('');
+  const [activityType, setActivityType] = useState('video');
 
   useEffect(() => {
     checkBackgroundStatus();
-    // Send initial heartbeat
     handleHeartbeat();
   }, []);
 
@@ -30,6 +42,7 @@ export default function HomeScreen() {
 
   const handleHeartbeat = async () => {
     await sendHeartbeat();
+    await sendSummaryReport();
     setLastSync(new Date());
   };
 
@@ -47,6 +60,42 @@ export default function HomeScreen() {
       ]
     );
   };
+
+  const handleReportActivity = async () => {
+    if (!activityTitle.trim()) {
+      Alert.alert('Error', 'Please enter what you were doing');
+      return;
+    }
+
+    try {
+      const storedChildName = await AsyncStorage.getItem('childName');
+      
+      await childAPI.submitActivity({
+        childName: storedChildName || childName,
+        activityType: activityType,
+        contentTitle: activityTitle.trim(),
+        contentUrl: null,
+        duration: 0,
+        timestamp: new Date().toISOString(),
+        manualReport: true,
+      });
+
+      Alert.alert('Reported!', 'Your activity has been sent to your parent.');
+      setShowReportModal(false);
+      setActivityTitle('');
+      handleHeartbeat();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to report activity. Please try again.');
+    }
+  };
+
+  const activityTypes = [
+    { id: 'video', label: 'Video', icon: 'videocam' },
+    { id: 'game', label: 'Game', icon: 'game-controller' },
+    { id: 'web', label: 'Website', icon: 'globe' },
+    { id: 'social', label: 'Social', icon: 'chatbubbles' },
+    { id: 'app', label: 'Other App', icon: 'apps' },
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -142,6 +191,15 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* Report Activity Button */}
+        <TouchableOpacity 
+          style={styles.reportButton} 
+          onPress={() => setShowReportModal(true)}
+        >
+          <Ionicons name="add-circle" size={22} color="#fff" />
+          <Text style={styles.reportButtonText}>Report What I'm Doing</Text>
+        </TouchableOpacity>
+
         {/* Sync Button */}
         <TouchableOpacity style={styles.syncButton} onPress={handleHeartbeat}>
           <Ionicons name="sync-outline" size={20} color="#667eea" />
@@ -162,6 +220,67 @@ export default function HomeScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Report Activity Modal */}
+      <Modal
+        visible={showReportModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowReportModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>What are you doing?</Text>
+              <TouchableOpacity onPress={() => setShowReportModal(false)}>
+                <Ionicons name="close" size={24} color="#718096" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalLabel}>Activity Type</Text>
+            <View style={styles.typeSelector}>
+              {activityTypes.map((type) => (
+                <TouchableOpacity
+                  key={type.id}
+                  style={[
+                    styles.typeButton,
+                    activityType === type.id && styles.typeButtonActive,
+                  ]}
+                  onPress={() => setActivityType(type.id)}
+                >
+                  <Ionicons 
+                    name={type.icon} 
+                    size={20} 
+                    color={activityType === type.id ? '#fff' : '#667eea'} 
+                  />
+                  <Text style={[
+                    styles.typeButtonText,
+                    activityType === type.id && styles.typeButtonTextActive,
+                  ]}>
+                    {type.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.modalLabel}>What are you watching/playing?</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="e.g., YouTube - Minecraft videos"
+              placeholderTextColor="#a0aec0"
+              value={activityTitle}
+              onChangeText={setActivityTitle}
+            />
+
+            <TouchableOpacity 
+              style={styles.submitButton}
+              onPress={handleReportActivity}
+            >
+              <Text style={styles.submitButtonText}>Send to Parent</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -304,6 +423,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#718096',
   },
+  reportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#48bb78',
+    borderRadius: 14,
+    height: 54,
+    gap: 10,
+    marginBottom: 12,
+    shadowColor: '#48bb78',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  reportButtonText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#fff',
+  },
   syncButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -344,6 +483,89 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 14,
     color: '#a0aec0',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1a202c',
+  },
+  modalLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4a5568',
+    marginBottom: 12,
+  },
+  typeSelector: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 20,
+  },
+  typeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#f0f4ff',
+    gap: 6,
+  },
+  typeButtonActive: {
+    backgroundColor: '#667eea',
+  },
+  typeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#667eea',
+  },
+  typeButtonTextActive: {
+    color: '#fff',
+  },
+  modalInput: {
+    backgroundColor: '#f7fafc',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: '#1a202c',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  submitButton: {
+    backgroundColor: '#667eea',
+    borderRadius: 14,
+    height: 54,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  submitButtonText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#fff',
   },
 });
 
