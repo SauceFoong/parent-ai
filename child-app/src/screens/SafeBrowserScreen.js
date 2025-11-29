@@ -14,6 +14,7 @@ import { captureRef } from 'react-native-view-shot';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { childAPI } from '../services/api';
+import { enterSafeBrowser, exitSafeBrowser } from '../services/monitoringService';
 
 const SCREENSHOT_INTERVAL = 60 * 1000; // Take screenshot every 60 seconds (was 30)
 const MIN_SCREENSHOT_GAP = 10 * 1000; // Minimum 10 seconds between screenshots
@@ -33,6 +34,9 @@ export default function SafeBrowserScreen({ navigation }) {
   const isCapturing = useRef(false); // Prevent concurrent captures
 
   useEffect(() => {
+    // Notify monitoring service that we're in Safe Browser
+    enterSafeBrowser();
+    
     // Start periodic screenshots after initial load
     screenshotInterval.current = setInterval(() => {
       // First update the title, then capture
@@ -41,6 +45,9 @@ export default function SafeBrowserScreen({ navigation }) {
     }, SCREENSHOT_INTERVAL);
     
     return () => {
+      // Notify monitoring service that we're leaving Safe Browser
+      exitSafeBrowser();
+      
       if (screenshotInterval.current) {
         clearInterval(screenshotInterval.current);
       }

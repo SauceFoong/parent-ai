@@ -14,6 +14,7 @@ let currentActivity = null;
 let activityStartTime = null;
 let summaryInterval = null;
 let appStateSubscription = null;
+let isInSafeBrowser = false; // Track if user is in Safe Browser
 
 // Device info helper
 export const getDeviceInfo = async () => {
@@ -35,6 +36,19 @@ export const getDeviceInfo = async () => {
     isDevice: Device.isDevice,
   };
 };
+
+// Track when entering/exiting Safe Browser
+export const enterSafeBrowser = () => {
+  isInSafeBrowser = true;
+  console.log('Entered Safe Browser - pausing app activity reports');
+};
+
+export const exitSafeBrowser = () => {
+  isInSafeBrowser = false;
+  console.log('Exited Safe Browser - resuming app activity reports');
+};
+
+export const isUserInSafeBrowser = () => isInSafeBrowser;
 
 // Start tracking an activity
 export const startActivity = (activityType, contentTitle, contentUrl = null) => {
@@ -139,6 +153,12 @@ export const sendHeartbeat = async () => {
 // Send activity summary report (called every minute)
 export const sendSummaryReport = async () => {
   try {
+    // Skip if user is in Safe Browser (it has its own activity reporting)
+    if (isInSafeBrowser) {
+      console.log('In Safe Browser, skipping app summary report');
+      return true;
+    }
+    
     const childName = await AsyncStorage.getItem('childName');
     const deviceToken = await AsyncStorage.getItem('deviceToken');
     
