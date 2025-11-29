@@ -477,3 +477,239 @@ exports.getChildSummaries = async (req, res) => {
   }
 };
 
+// @desc    Submit app usage data from child device
+// @route   POST /api/child/app-usage
+// @access  Public (with device token)
+exports.submitAppUsage = async (req, res) => {
+  try {
+    const deviceToken = req.headers['x-device-token'];
+    const { childName, timestamp, periodStart, periodEnd, apps } = req.body;
+
+    if (!deviceToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Device token required',
+      });
+    }
+
+    // Get device to find parent
+    const device = await firestoreService.getDocument('linkedDevices', deviceToken);
+    if (!device) {
+      return res.status(404).json({
+        success: false,
+        message: 'Device not found',
+      });
+    }
+
+    // Calculate total screen time
+    const totalScreenTime = apps.reduce((sum, app) => sum + (app.totalTimeInForeground || 0), 0);
+
+    // Save app usage to Firebase collection
+    const usageRecord = await firestoreService.createDocument('appUsage', {
+      parentId: device.parentId,
+      childName: childName || device.childName,
+      deviceId: deviceToken,
+      timestamp: timestamp || new Date().toISOString(),
+      periodStart,
+      periodEnd,
+      totalScreenTime,
+      appCount: apps.length,
+      apps: apps.map(app => ({
+        packageName: app.packageName,
+        appName: app.appName,
+        totalTimeInForeground: app.totalTimeInForeground,
+        lastTimeUsed: app.lastTimeUsed,
+      })),
+      createdAt: new Date().toISOString(),
+    });
+
+    // Check for concerning usage and notify parent if needed
+    const concerningApps = apps.filter(app => {
+      const concerningPackages = [
+        'com.zhiliaoapp.musically', // TikTok
+        'com.instagram.android',
+        'com.snapchat.android',
+      ];
+      return concerningPackages.includes(app.packageName) && app.totalTimeInForeground > 60 * 60 * 1000;
+    });
+
+    if (concerningApps.length > 0 || totalScreenTime > 4 * 60 * 60 * 1000) {
+      // Create notification for parent
+      await firestoreService.createDocument('notifications', {
+        userId: device.parentId,
+        type: 'screen_time_alert',
+        title: 'Screen Time Alert',
+        message: totalScreenTime > 4 * 60 * 60 * 1000 
+          ? `${childName} has used their device for over 4 hours today.`
+          : `${childName} has spent significant time on social media apps.`,
+        childName,
+        data: {
+          totalScreenTime,
+          concerningApps: concerningApps.map(a => a.appName),
+        },
+        read: false,
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    logger.info(`App usage received from ${childName}: ${apps.length} apps, ${Math.round(totalScreenTime / 60000)}min total`);
+
+    res.json({
+      success: true,
+      message: 'App usage recorded',
+      usageId: usageRecord.id,
+    });
+  } catch (error) {
+    logger.error(`Submit app usage error: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to record app usage',
+    });
+  }
+};
+
+// @desc    Get all app usage for parent's children
+// @route   GET /api/child/app-usage
+// @access  Private (Parent)
+exports.getAppUsage = async (req, res) => {
+  try {
+    const parentId = req.user.id;
+    const { days = 7 } = req.query;
+
+    // Get app usage for this parent's children
+    const usageRecords = await firestoreService.queryDocuments('appUsage', {
+      where: [['parentId', '==', parentId]],
+    });
+
+    // Filter to last N days and sort
+    const cutoffTime = new Date(Date.now() - parseInt(days) * 24 * 60 * 60 * 1000);
+    const recentUsage = usageRecords
+      .filter(r => new Date(r.timestamp) >= cutoffTime)
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    // Aggregate by child
+    const byChild = {};
+    recentUsage.forEach(record => {
+      if (!byChild[record.childName]) {
+        byChild[record.childName] = {
+          childName: record.childName,
+          totalScreenTime: 0,
+          records: [],
+          topApps: {},
+        };
+      }
+      byChild[record.childName].totalScreenTime += record.totalScreenTime;
+      byChild[record.childName].records.push(record);
+      
+      // Aggregate app usage
+      record.apps.forEach(app => {
+        if (!byChild[record.childName].topApps[app.packageName]) {
+          byChild[record.childName].topApps[app.packageName] = {
+            packageName: app.packageName,
+            appName: app.appName,
+            totalTime: 0,
+          };
+        }
+        byChild[record.childName].topApps[app.packageName].totalTime += app.totalTimeInForeground;
+      });
+    });
+
+    // Convert topApps to sorted array
+    Object.values(byChild).forEach(child => {
+      child.topApps = Object.values(child.topApps)
+        .sort((a, b) => b.totalTime - a.totalTime)
+        .slice(0, 10);
+    });
+
+    res.json({
+      success: true,
+      days: parseInt(days),
+      children: Object.values(byChild),
+    });
+  } catch (error) {
+    logger.error(`Get app usage error: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get app usage',
+    });
+  }
+};
+
+// @desc    Get app usage for a specific child
+// @route   GET /api/child/app-usage/:childName
+// @access  Private (Parent)
+exports.getChildAppUsage = async (req, res) => {
+  try {
+    const parentId = req.user.id;
+    const { childName } = req.params;
+    const { days = 7 } = req.query;
+
+    // Get app usage for this child
+    const usageRecords = await firestoreService.queryDocuments('appUsage', {
+      where: [
+        ['parentId', '==', parentId],
+        ['childName', '==', childName],
+      ],
+    });
+
+    // Filter to last N days and sort
+    const cutoffTime = new Date(Date.now() - parseInt(days) * 24 * 60 * 60 * 1000);
+    const recentUsage = usageRecords
+      .filter(r => new Date(r.timestamp) >= cutoffTime)
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    // Calculate daily totals
+    const dailyTotals = {};
+    const appTotals = {};
+
+    recentUsage.forEach(record => {
+      const day = new Date(record.timestamp).toISOString().split('T')[0];
+      
+      if (!dailyTotals[day]) {
+        dailyTotals[day] = 0;
+      }
+      dailyTotals[day] += record.totalScreenTime;
+
+      record.apps.forEach(app => {
+        if (!appTotals[app.packageName]) {
+          appTotals[app.packageName] = {
+            packageName: app.packageName,
+            appName: app.appName,
+            totalTime: 0,
+          };
+        }
+        appTotals[app.packageName].totalTime += app.totalTimeInForeground;
+      });
+    });
+
+    // Convert to arrays
+    const dailyData = Object.entries(dailyTotals)
+      .map(([date, time]) => ({ date, totalTime: time }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const topApps = Object.values(appTotals)
+      .sort((a, b) => b.totalTime - a.totalTime)
+      .slice(0, 15);
+
+    const totalScreenTime = recentUsage.reduce((sum, r) => sum + r.totalScreenTime, 0);
+    const averageDaily = dailyData.length > 0 ? totalScreenTime / dailyData.length : 0;
+
+    res.json({
+      success: true,
+      childName,
+      days: parseInt(days),
+      totalScreenTime,
+      averageDaily,
+      dailyData,
+      topApps,
+      recentRecords: recentUsage.slice(0, 10),
+    });
+  } catch (error) {
+    logger.error(`Get child app usage error: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get child app usage',
+    });
+  }
+};
+

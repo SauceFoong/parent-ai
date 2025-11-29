@@ -7,6 +7,7 @@ const childController = require('../controllers/childController');
 router.post('/link', childController.linkDevice);
 router.post('/heartbeat', childController.sendHeartbeat);
 router.post('/summary', childController.submitSummary);
+router.post('/app-usage', childController.submitAppUsage);
 
 // Protected routes (require parent auth)
 router.get('/devices', protect, childController.getLinkedDevices);
@@ -16,6 +17,8 @@ router.get('/status', childController.checkStatus);
 router.get('/settings', childController.getSettings);
 router.get('/summaries', protect, childController.getSummaries);
 router.get('/summaries/:childName', protect, childController.getChildSummaries);
+router.get('/app-usage', protect, childController.getAppUsage);
+router.get('/app-usage/:childName', protect, childController.getChildAppUsage);
 
 module.exports = router;
 

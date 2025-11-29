@@ -22,7 +22,7 @@ import {
 import { childAPI } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) {
   const { childName, parentName, monitoringActive, unlinkDevice } = useDevice();
   const [backgroundActive, setBackgroundActive] = useState(false);
   const [lastSync, setLastSync] = useState(null);
@@ -190,6 +190,15 @@ export default function HomeScreen() {
             </View>
           </View>
         </View>
+
+        {/* Screen Time Button */}
+        <TouchableOpacity 
+          style={styles.screenTimeButton} 
+          onPress={() => navigation.navigate('AppUsage')}
+        >
+          <Ionicons name="time" size={22} color="#fff" />
+          <Text style={styles.screenTimeButtonText}>View My Screen Time</Text>
+        </TouchableOpacity>
 
         {/* Report Activity Button */}
         <TouchableOpacity 
@@ -422,6 +431,26 @@ const styles = StyleSheet.create({
   infoDescription: {
     fontSize: 13,
     color: '#718096',
+  },
+  screenTimeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#667eea',
+    borderRadius: 14,
+    height: 54,
+    gap: 10,
+    marginBottom: 12,
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  screenTimeButtonText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#fff',
   },
   reportButton: {
     flexDirection: 'row',

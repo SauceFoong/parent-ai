@@ -134,12 +134,12 @@ export default function DashboardScreen({ navigation }) {
 
               <TouchableOpacity
                 style={[styles.actionButton, styles.cardElevation]}
-                onPress={() => navigation.navigate('ActivityTimeline', {})}
+                onPress={() => navigation.navigate('ScreenTime', {})}
               >
                 <View style={[styles.actionIcon, { backgroundColor: '#48bb78' }]}>
                   <Ionicons name="time-outline" size={24} color="#fff" />
                 </View>
-                <Text style={styles.actionText}>Live Activity</Text>
+                <Text style={styles.actionText}>Screen Time</Text>
               </TouchableOpacity>
             </View>
           </View>

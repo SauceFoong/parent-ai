@@ -50,6 +50,10 @@ export const childAPI = {
   submitSummary: (summaryData) => 
     api.post('/child/summary', summaryData),
   
+  // Submit app usage data
+  submitAppUsage: (usageData) => 
+    api.post('/child/app-usage', usageData),
+  
   // Get monitoring settings from parent
   getSettings: () => 
     api.get('/child/settings'),
