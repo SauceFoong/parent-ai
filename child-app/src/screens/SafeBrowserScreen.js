@@ -15,7 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { childAPI } from '../services/api';
 
-const SCREENSHOT_INTERVAL = 30 * 1000; // Take screenshot every 30 seconds
+const SCREENSHOT_INTERVAL = 60 * 1000; // Take screenshot every 60 seconds (was 30)
+const MIN_SCREENSHOT_GAP = 10 * 1000; // Minimum 10 seconds between screenshots
 
 export default function SafeBrowserScreen({ navigation }) {
   const [url, setUrl] = useState('https://www.google.com');
@@ -28,10 +29,16 @@ export default function SafeBrowserScreen({ navigation }) {
   const webViewRef = useRef(null);
   const viewShotRef = useRef(null);
   const screenshotInterval = useRef(null);
+  const lastScreenshotTime = useRef(0); // Track last screenshot time
+  const isCapturing = useRef(false); // Prevent concurrent captures
 
   useEffect(() => {
-    // Start periodic screenshots
-    startScreenshotCapture();
+    // Start periodic screenshots after initial load
+    screenshotInterval.current = setInterval(() => {
+      // First update the title, then capture
+      updatePageTitle();
+      setTimeout(() => captureAndSendScreenshot(), 500);
+    }, SCREENSHOT_INTERVAL);
     
     return () => {
       if (screenshotInterval.current) {
@@ -39,18 +46,6 @@ export default function SafeBrowserScreen({ navigation }) {
       }
     };
   }, []);
-
-  const startScreenshotCapture = () => {
-    // Take initial screenshot after page loads
-    setTimeout(() => captureAndSendScreenshot(), 3000);
-    
-    // Then take screenshots periodically
-    screenshotInterval.current = setInterval(() => {
-      // First update the title, then capture
-      updatePageTitle();
-      setTimeout(() => captureAndSendScreenshot(), 500);
-    }, SCREENSHOT_INTERVAL);
-  };
   
   const updatePageTitle = () => {
     if (webViewRef.current) {
@@ -67,9 +62,25 @@ export default function SafeBrowserScreen({ navigation }) {
     }
   };
 
-  const captureAndSendScreenshot = async () => {
+  const captureAndSendScreenshot = async (force = false) => {
     try {
+      // Prevent concurrent captures
+      if (isCapturing.current) {
+        console.log('Screenshot capture already in progress, skipping');
+        return;
+      }
+      
+      // Check minimum gap between screenshots (unless forced)
+      const now = Date.now();
+      if (!force && (now - lastScreenshotTime.current) < MIN_SCREENSHOT_GAP) {
+        console.log('Too soon since last screenshot, skipping');
+        return;
+      }
+      
       if (!viewShotRef.current) return;
+      
+      isCapturing.current = true;
+      lastScreenshotTime.current = now;
       
       // Capture screenshot
       const uri = await captureRef(viewShotRef, {
@@ -113,6 +124,8 @@ export default function SafeBrowserScreen({ navigation }) {
       console.log('Screenshot captured and sent:', title);
     } catch (error) {
       console.log('Screenshot capture failed:', error.message);
+    } finally {
+      isCapturing.current = false;
     }
   };
 
@@ -264,10 +277,8 @@ export default function SafeBrowserScreen({ navigation }) {
           onLoadStart={() => setLoading(true)}
           onLoadEnd={() => {
             setLoading(false);
-            // Capture screenshot when page loads
-            setTimeout(() => captureAndSendScreenshot(), 1000);
             
-            // Also try to get title via JS injection after load
+            // Get title via JS injection after load
             if (webViewRef.current) {
               webViewRef.current.injectJavaScript(`
                 (function() {
@@ -279,6 +290,12 @@ export default function SafeBrowserScreen({ navigation }) {
                 })();
                 true;
               `);
+            }
+            
+            // Take initial screenshot after first page load (with 3s delay)
+            // Only if no screenshot has been taken yet
+            if (lastScreenshotTime.current === 0) {
+              setTimeout(() => captureAndSendScreenshot(true), 3000);
             }
           }}
           onNavigationStateChange={handleNavigationStateChange}
