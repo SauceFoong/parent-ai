@@ -14,6 +14,7 @@ import ActivitiesScreen from '../screens/ActivitiesScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import AddChildScreen from '../screens/AddChildScreen';
+import LinkDeviceScreen from '../screens/LinkDeviceScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -138,6 +139,13 @@ function MainStack() {
             fontWeight: 'bold',
           },
           headerBackTitleVisible: false,
+        }}
+      />
+      <Stack.Screen
+        name="LinkDevice"
+        component={LinkDeviceScreen}
+        options={{
+          headerShown: false,
         }}
       />
     </Stack.Navigator>

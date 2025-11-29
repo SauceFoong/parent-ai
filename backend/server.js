@@ -50,6 +50,7 @@ try {
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/monitoring', require('./routes/monitoring'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/child', require('./routes/child'));
 app.use('/api/test', require('./routes/test'));
 
 // Health check route

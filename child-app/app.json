@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Parent AI Child",
+    "slug": "parent-ai-child",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#f0f4ff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.parentai.child",
+      "infoPlist": {
+        "UIBackgroundModes": ["fetch", "remote-notification"]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#f0f4ff"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.parentai.child",
+      "permissions": ["RECEIVE_BOOT_COMPLETED", "FOREGROUND_SERVICE"]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-background-fetch"
+    ]
+  }
+}

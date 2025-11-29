@@ -124,12 +124,12 @@ export default function DashboardScreen({ navigation }) {
             <View style={styles.actionButtonsRow}>
               <TouchableOpacity
                 style={[styles.actionButton, styles.cardElevation]}
-                onPress={() => navigation.navigate('AddChild')}
+                onPress={() => navigation.navigate('LinkDevice')}
               >
-                <View style={[styles.actionIcon, { backgroundColor: '#4facfe' }]}>
-                  <Ionicons name="person-add-outline" size={24} color="#fff" />
+                <View style={[styles.actionIcon, { backgroundColor: '#667eea' }]}>
+                  <Ionicons name="phone-portrait-outline" size={24} color="#fff" />
                 </View>
-                <Text style={styles.actionText}>Add Child</Text>
+                <Text style={styles.actionText}>Link Device</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
