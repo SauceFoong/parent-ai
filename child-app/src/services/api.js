@@ -46,6 +46,10 @@ export const childAPI = {
   sendHeartbeat: (deviceInfo) => 
     api.post('/child/heartbeat', deviceInfo),
   
+  // Submit summary report (every minute)
+  submitSummary: (summaryData) => 
+    api.post('/child/summary', summaryData),
+  
   // Get monitoring settings from parent
   getSettings: () => 
     api.get('/child/settings'),

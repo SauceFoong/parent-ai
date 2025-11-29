@@ -6,6 +6,7 @@ const childController = require('../controllers/childController');
 // Public routes (for child device)
 router.post('/link', childController.linkDevice);
 router.post('/heartbeat', childController.sendHeartbeat);
+router.post('/summary', childController.submitSummary);
 
 // Protected routes (require parent auth)
 router.get('/devices', protect, childController.getLinkedDevices);
@@ -13,6 +14,8 @@ router.post('/generate-code', protect, childController.generatePairingCode);
 router.delete('/devices/:deviceId', protect, childController.unlinkDevice);
 router.get('/status', childController.checkStatus);
 router.get('/settings', childController.getSettings);
+router.get('/summaries', protect, childController.getSummaries);
+router.get('/summaries/:childName', protect, childController.getChildSummaries);
 
 module.exports = router;
 

@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  ScrollView,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -92,16 +94,21 @@ export default function LinkDeviceScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <View style={styles.content}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#1a202c" />
-          </TouchableOpacity>
-          <Text style={styles.title}>Link Child Device</Text>
-          <View style={styles.placeholder} />
-        </View>
+    <SafeAreaView style={styles.container}>
+      {/* Header - Fixed at top */}
+      <View style={styles.header}>
+        <Pressable 
+          onPress={() => navigation.goBack()} 
+          style={styles.backButton}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="arrow-back" size={24} color="#1a202c" />
+        </Pressable>
+        <Text style={styles.title}>Link Child Device</Text>
+        <View style={styles.placeholder} />
+      </View>
+      
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
 
         {/* Instructions */}
         <View style={styles.instructionsCard}>
@@ -189,7 +196,7 @@ export default function LinkDeviceScreen({ navigation }) {
             ))
           )}
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -199,21 +206,30 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
-  content: {
+  scrollView: {
     flex: 1,
+  },
+  content: {
     padding: 20,
+    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#f8f9fa',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
   },
   backButton: {
     padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#fff',
   },
   title: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: '#1a202c',
   },

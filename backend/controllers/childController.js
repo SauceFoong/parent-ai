@@ -320,3 +320,160 @@ exports.getSettings = async (req, res) => {
   }
 };
 
+// @desc    Submit activity summary report (every minute from child device)
+// @route   POST /api/child/summary
+// @access  Public (with device token)
+exports.submitSummary = async (req, res) => {
+  try {
+    const deviceToken = req.headers['x-device-token'];
+    const { childName, timestamp, appState, currentActivity, deviceInfo } = req.body;
+
+    if (!deviceToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Device token required',
+      });
+    }
+
+    // Get device to find parent
+    const device = await firestoreService.getDocument('linkedDevices', deviceToken);
+    if (!device) {
+      return res.status(404).json({
+        success: false,
+        message: 'Device not found',
+      });
+    }
+
+    // Save summary to Firebase collection
+    const summary = await firestoreService.createDocument('activitySummaries', {
+      parentId: device.parentId,
+      childName: childName || device.childName,
+      deviceId: deviceToken,
+      timestamp: timestamp || new Date().toISOString(),
+      appState: appState || 'unknown',
+      currentActivity: currentActivity || null,
+      deviceInfo: deviceInfo || {},
+      createdAt: new Date().toISOString(),
+    });
+
+    // Update device last seen
+    await firestoreService.updateDocument('linkedDevices', deviceToken, {
+      lastSeen: new Date().toISOString(),
+      lastActivity: currentActivity,
+      isActive: true,
+    });
+
+    logger.info(`Summary received from ${childName}: ${currentActivity?.title || 'idle'}`);
+
+    res.json({
+      success: true,
+      message: 'Summary recorded',
+      summaryId: summary.id,
+    });
+  } catch (error) {
+    logger.error(`Submit summary error: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to record summary',
+    });
+  }
+};
+
+// @desc    Get all summaries for parent's children
+// @route   GET /api/child/summaries
+// @access  Private (Parent)
+exports.getSummaries = async (req, res) => {
+  try {
+    const parentId = req.user.id;
+    const { limit = 100, startDate, endDate } = req.query;
+
+    // Get summaries for this parent
+    const summaries = await firestoreService.queryDocuments('activitySummaries', {
+      where: [['parentId', '==', parentId]],
+    });
+
+    // Sort by timestamp (newest first) and limit
+    const sortedSummaries = summaries
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, parseInt(limit));
+
+    // Filter by date if provided
+    let filteredSummaries = sortedSummaries;
+    if (startDate) {
+      filteredSummaries = filteredSummaries.filter(s => new Date(s.timestamp) >= new Date(startDate));
+    }
+    if (endDate) {
+      filteredSummaries = filteredSummaries.filter(s => new Date(s.timestamp) <= new Date(endDate));
+    }
+
+    res.json({
+      success: true,
+      count: filteredSummaries.length,
+      summaries: filteredSummaries.map(s => ({
+        id: s.id,
+        childName: s.childName,
+        timestamp: s.timestamp,
+        appState: s.appState,
+        currentActivity: s.currentActivity,
+        deviceInfo: s.deviceInfo,
+      })),
+    });
+  } catch (error) {
+    logger.error(`Get summaries error: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get summaries',
+    });
+  }
+};
+
+// @desc    Get summaries for a specific child
+// @route   GET /api/child/summaries/:childName
+// @access  Private (Parent)
+exports.getChildSummaries = async (req, res) => {
+  try {
+    const parentId = req.user.id;
+    const { childName } = req.params;
+    const { limit = 60, minutes = 60 } = req.query; // Default last 60 minutes
+
+    // Get summaries for this child
+    const summaries = await firestoreService.queryDocuments('activitySummaries', {
+      where: [
+        ['parentId', '==', parentId],
+        ['childName', '==', childName],
+      ],
+    });
+
+    // Filter to last N minutes and sort
+    const cutoffTime = new Date(Date.now() - parseInt(minutes) * 60 * 1000);
+    const recentSummaries = summaries
+      .filter(s => new Date(s.timestamp) >= cutoffTime)
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, parseInt(limit));
+
+    // Create a timeline of activities
+    const timeline = recentSummaries.map(s => ({
+      time: new Date(s.timestamp).toLocaleTimeString(),
+      timestamp: s.timestamp,
+      activity: s.currentActivity?.title || 'Idle',
+      type: s.currentActivity?.type || 'idle',
+      duration: s.currentActivity?.duration || 0,
+      appState: s.appState,
+    }));
+
+    res.json({
+      success: true,
+      childName,
+      count: recentSummaries.length,
+      timeline,
+      summaries: recentSummaries,
+    });
+  } catch (error) {
+    logger.error(`Get child summaries error: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get child summaries',
+    });
+  }
+};
+
