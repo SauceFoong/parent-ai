@@ -46,8 +46,25 @@ export default function SafeBrowserScreen({ navigation }) {
     
     // Then take screenshots periodically
     screenshotInterval.current = setInterval(() => {
-      captureAndSendScreenshot();
+      // First update the title, then capture
+      updatePageTitle();
+      setTimeout(() => captureAndSendScreenshot(), 500);
     }, SCREENSHOT_INTERVAL);
+  };
+  
+  const updatePageTitle = () => {
+    if (webViewRef.current) {
+      webViewRef.current.injectJavaScript(`
+        (function() {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'pageInfo',
+            title: document.title,
+            url: window.location.href
+          }));
+        })();
+        true;
+      `);
+    }
   };
 
   const captureAndSendScreenshot = async () => {
@@ -63,17 +80,37 @@ export default function SafeBrowserScreen({ navigation }) {
 
       const childName = await AsyncStorage.getItem('childName');
       
+      // Get a meaningful title - fallback to URL domain if title is empty
+      let title = currentTitle;
+      if (!title || title.trim() === '') {
+        // Extract domain from URL as fallback
+        try {
+          const urlObj = new URL(url);
+          title = urlObj.hostname.replace('www.', '');
+          
+          // Add path info for context
+          if (urlObj.pathname && urlObj.pathname !== '/') {
+            const pathPart = urlObj.pathname.split('/').filter(p => p).slice(0, 2).join('/');
+            if (pathPart) {
+              title = `${title}/${pathPart}`;
+            }
+          }
+        } catch (e) {
+          title = url;
+        }
+      }
+      
       // Send to backend for AI analysis
       await childAPI.submitActivity({
         childName: childName || 'Unknown',
         activityType: 'web',
-        contentTitle: currentTitle || url,
+        contentTitle: title,
         contentUrl: url,
         screenshot: uri, // Base64 image
         timestamp: new Date().toISOString(),
       });
 
-      console.log('Screenshot captured and sent:', currentTitle);
+      console.log('Screenshot captured and sent:', title);
     } catch (error) {
       console.log('Screenshot capture failed:', error.message);
     }
@@ -102,11 +139,43 @@ export default function SafeBrowserScreen({ navigation }) {
   const handleNavigationStateChange = (navState) => {
     setCanGoBack(navState.canGoBack);
     setCanGoForward(navState.canGoForward);
-    setCurrentTitle(navState.title || '');
     
-    // Update input to show current URL
+    // Update title if available
+    if (navState.title && navState.title.trim() !== '') {
+      setCurrentTitle(navState.title);
+    }
+    
+    // Update URL
     if (navState.url && navState.url !== url) {
       setUrl(navState.url);
+    }
+    
+    // Inject JS to get the actual page title (for SPAs like YouTube)
+    if (webViewRef.current) {
+      webViewRef.current.injectJavaScript(`
+        (function() {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'pageInfo',
+            title: document.title,
+            url: window.location.href
+          }));
+        })();
+        true;
+      `);
+    }
+  };
+  
+  const handleWebViewMessage = (event) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === 'pageInfo') {
+        if (data.title && data.title.trim() !== '') {
+          setCurrentTitle(data.title);
+          console.log('Page title updated:', data.title);
+        }
+      }
+    } catch (e) {
+      // Ignore non-JSON messages
     }
   };
 
@@ -197,12 +266,29 @@ export default function SafeBrowserScreen({ navigation }) {
             setLoading(false);
             // Capture screenshot when page loads
             setTimeout(() => captureAndSendScreenshot(), 1000);
+            
+            // Also try to get title via JS injection after load
+            if (webViewRef.current) {
+              webViewRef.current.injectJavaScript(`
+                (function() {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'pageInfo',
+                    title: document.title,
+                    url: window.location.href
+                  }));
+                })();
+                true;
+              `);
+            }
           }}
           onNavigationStateChange={handleNavigationStateChange}
+          onMessage={handleWebViewMessage}
           javaScriptEnabled={true}
           domStorageEnabled={true}
           startInLoadingState={true}
           scalesPageToFit={true}
+          allowsInlineMediaPlayback={true}
+          mediaPlaybackRequiresUserAction={false}
         />
         
         {loading && (
